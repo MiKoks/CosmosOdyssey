@@ -1,7 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\PricelistController;
+use App\Http\Controllers\ReservationController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -13,6 +14,9 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', function () {return view('welcome');});
+Route::get('/api/pricelists', [PricelistController::class, 'fetchActivePricelists']);
+Route::get('/api/pricelists/history', [PricelistController::class, 'getStoredPricelists']);
+Route::post('/api/reservations', [ReservationController::class, 'store']);
+Route::get('/api/reservations', [ReservationController::class, 'index']);
+

@@ -10,7 +10,7 @@ class PricelistController extends Controller
     public function fetchActivePricelists()
     {
         #kuna hetkel pole live keskkond
-        $response = Http::withOptions(['verify' => false])->get('https://cosmos-odyssey.azurewebsites.net/api/v1.0/TravelPrices');
+        $response = Http::withOptions(['verify' => false])->get('https://cosmosodyssey.azurewebsites.net/api/v1.0/TravelPrices');
 
         if ($response->ok()) {
             $data = $response->json();
@@ -43,5 +43,22 @@ class PricelistController extends Controller
             ->get();
 
         return response()->json($pricelists);
+    }
+
+    public function store(Request $request)
+    {
+        // Validate and save the pricelist
+        $data = $request->all();
+        $pricelist = Pricelist::create($data);
+
+        // Keep only the last 15 pricelists
+        $totalPricelists = Pricelist::count();
+
+        if ($totalPricelists > 15) {
+            // Delete the oldest pricelist
+            Pricelist::orderBy('created_at')->first()->delete();
+        }
+
+        return response()->json(['message' => 'Pricelist stored successfully']);
     }
 }

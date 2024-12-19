@@ -16,19 +16,24 @@ code {
 
 /* Outer Container */
 .reservation-container {
+  animation: fadeIn 0.75s ease-in-out;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  height: 100vh; /* Full height of the viewport */
+  height: 95vh; /* Full height of the viewport */
   text-align: center;
   padding: 20px;
   background-color: #f4f4f9; /* Optional background color */
   box-sizing: border-box;
 }
 
+.reservation-container * {
+  animation: inherit;
+}
+
 /* Title Styling */
 .reservation-title {
+  animation: fadeIn 0.75s ease-in-out;
   margin-bottom: 10px;
 }
 
@@ -48,6 +53,10 @@ code {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
   scrollbar-width: none; /* For Firefox */
+  height: 100%;
+  min-height: 350px;
+  max-height: 450px;
+  user-select: none; /* Prevent text selection while dragging */
 }
 
 .card-container::-webkit-scrollbar {
@@ -113,4 +122,190 @@ code {
   border: none;
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.filter-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.filter-input {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  width: 60%;
+}
+
+.filter-select {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  width: 35%;
+}
+
+.sort-container {
+  display: flex;
+  justify-content: center;
+  gap: 15px; /* Increased space between buttons */
+  margin-bottom: 20px; /* Space below the filter bar */
+}
+
+.sort-button {
+  padding: 6px 15px; /* Reduced button size */
+  background: linear-gradient(to right, #f0f9ff, #cfeffd);
+  border: 1px solid #b0d4f1;
+  border-radius: 25px; /* Still rounded but fits smaller buttons */
+  cursor: pointer;
+  transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
+  font-size: 12px; /* Reduced font size for smaller buttons */
+  font-weight: bold;
+  color: #0056b3; /* Light blue for text */
+}
+
+.sort-button.active {
+  background: linear-gradient(to right, #0056b3, #cfeffd);
+  color: #fff;
+  border-color: #0056b3;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.sort-button:hover {
+  background: linear-gradient(to right, #cfeffd, #0056b3);
+  color: #fff;
+  box-shadow: 0 5px 7px rgba(0, 0, 0, 0.2);
+}
+
+.filter-dropdown-container {
+  margin-bottom: 15px; /* Space between dropdown and sorting buttons */
+  text-align: center;
+  position: relative; /* Ensure dropdown menu is positioned relative to the container */
+}
+
+.filter-dropdown {
+  padding: 6px 15px;
+  background: linear-gradient(to right, #f0f9ff, #cfeffd);
+  border: 1px solid #b0d4f1;
+  border-radius: 25px; /* Rounded dropdown */
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
+  font-size: 12px;
+  font-weight: bold;
+  color: #0056b3;
+  cursor: pointer;
+  transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+  margin-right: 20px; /* Space to the right of dropdown */
+}
+
+.filter-dropdown:hover {
+  background: linear-gradient(to right, #cfeffd, #0056b3);
+  color: #0056b3;
+  box-shadow: 0 5px 7px rgba(0, 0, 0, 0.2);
+}
+
+.filter-dropdown-menu {
+  position: absolute; /* Position relative to the container */
+  top: 100%; /* Place right below the dropdown button */
+  left: 0;
+  right: 0;
+  background: linear-gradient(to right, #f0f9ff, #cfeffd);
+  border: 1px solid #b0d4f1;
+  border-radius: 10px;
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.2);
+  padding: 10px 0; /* Space for menu items */
+  z-index: 1000; /* Ensure it appears above other content */
+  display: none; /* Initially hidden */
+}
+
+.filter-dropdown-menu.show {
+  display: block; /* Show the menu when active */
+}
+
+.filter-dropdown-menu li {
+  padding: 8px 15px;
+  font-size: 12px;
+  color: #0056b3;
+  cursor: pointer;
+  transition: background 0.3s, color 0.3s;
+}
+
+.filter-dropdown-menu li:hover {
+  background: #0056b3;
+  color: #fff;
+}
+
+.expired-card {
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  background: #f8d7da; /* Light red background */
+  color: #721c24; /* Dark red text */
+  text-align: center;
+  font-weight: bold;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Navbar */
+.navbar {
+  background: linear-gradient(to right, #f0f9ff, #cfeffd);
+  padding: 15px 0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+  height: 2vh; /* Fixed height for the navbar */
+  justify-content: center;
+}
+
+/* Navbar list styles */
+.navbar ul {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar ul li {
+  margin: 0 15px;
+}
+
+.navbar-link {
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: bold;
+  color: #0056b3;
+  transition: color 0.3s, transform 0.3s;
+}
+
+.navbar-link:hover {
+  color: #fff;
+  transform: scale(1.1);
+}
+
+/* Main Content */
+.main-content {
+  margin-top: 5vh;
+  height: 100%;
+}
+
+.initial-dropdowns {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

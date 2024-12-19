@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import '../index.css';
 
@@ -20,16 +20,18 @@ function ReservationForm() {
 
   const [autoScroll, setAutoScroll] = useState(true);
   const [companyFilter, setCompanyFilter] = useState('');
+
+  // One sorting criterion at a time, but cycles through asc->desc->off
   const [sortCriteria, setSortCriteria] = useState([]);
 
   const scrollContainerRef = useRef(null);
 
-  // For drag scrolling
+  // Drag scrolling variables
   const [mouseDown, setMouseDown] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(null);
   const [scrollTop, setScrollTop] = useState(0);
-  
+
   const [didMove, setDidMove] = useState(false);
   const [mouseDownProvider, setMouseDownProvider] = useState(null);
   const [mouseDownLeg, setMouseDownLeg] = useState(null);
@@ -59,7 +61,6 @@ function ReservationForm() {
       .catch((err) => console.error('Error fetching routes:', err));
   }, []);
 
-  // Back-and-forth auto-scroll logic
   useEffect(() => {
     let interval;
     if (autoScroll && scrollContainerRef.current) {
@@ -97,7 +98,6 @@ function ReservationForm() {
       container.style.cursor = 'grabbing';
     }
 
-    // Identify card at mousedown
     const cardDiv = e.target.closest('.card');
     if (cardDiv && filteredRoutes) {
       const cardId = cardDiv.getAttribute('data-id');
@@ -139,7 +139,7 @@ function ReservationForm() {
   };
 
   const handleMouseMove = (e) => {
-    if (!mouseDown || startY === null) return; 
+    if (!mouseDown || startY === null) return;
 
     const diff = Math.abs(e.clientY - startY);
     if (diff > 5 && !didMove) {
@@ -183,103 +183,98 @@ function ReservationForm() {
       );
   };
 
-  function compareByKey(a, b, key) {
+  function calculateTravelTime(provider) {
+    if (!provider) return 0;
+    const start = new Date(provider.flightStart);
+    const end = new Date(provider.flightEnd);
+    return Math.round((end - start) / (1000 * 60 * 60));
+  }
+
+  // compareByKey: price/travelTime at provider level, distance at leg level
+  function compareByKey(a, b, key, isProviderLevel = true) {
     if (key === 'price') {
+      if (!isProviderLevel) return 0;
       return a.price - b.price;
     } else if (key === 'travelTime') {
+      if (!isProviderLevel) return 0;
       return a.travelTime - b.travelTime;
     } else if (key === 'distance') {
-      // Distance applies at leg level, not provider level, so return 0 here.
-      return 0;
+      if (isProviderLevel) return 0; 
+      return a.routeInfo.distance - b.routeInfo.distance;
     }
     return 0;
   }
 
-  const handleSort = (criteria) => {
-    const existingIndex = sortCriteria.findIndex((c) => c.key === criteria);
-    let updatedCriteria;
-
-    if (existingIndex === -1) {
-      updatedCriteria = [...sortCriteria, { key: criteria, order: 'asc' }];
-    } else if (sortCriteria[existingIndex].order === 'asc') {
-      updatedCriteria = sortCriteria.map((c, i) =>
-        i === existingIndex ? { ...c, order: 'desc' } : c
-      );
-    } else {
-      updatedCriteria = sortCriteria.filter((_, i) => i !== existingIndex);
+  const applyFiltersAndSorting = useCallback((origin, destination, company, allRoutes) => {
+    if (!origin || !destination) {
+      setFilteredRoutes([]);
+      return;
     }
 
-    setSortCriteria(updatedCriteria);
+    let filtered = allRoutes.filter(
+      (leg) =>
+        leg.routeInfo.from.name === origin &&
+        leg.routeInfo.to.name === destination
+    );
 
-    const sortedRoutes = [...filteredRoutes];
+    if (company) {
+      filtered = filtered
+        .map((leg) => ({
+          ...leg,
+          providers: leg.providers.filter((provider) => provider.company.name === company),
+        }))
+        .filter((leg) => leg.providers.length > 0);
+    }
 
-    sortedRoutes.forEach((leg) => {
-      leg.providers.sort((a, b) => {
-        if (updatedCriteria.length === 0) {
-          return 0;
-        } else if (updatedCriteria.length === 1) {
-          // Single criterion: simple comparison
-          const { key, order } = updatedCriteria[0];
-          const comparison = compareByKey(a, b, key);
+    if (sortCriteria.length > 0) {
+      const { key, order } = sortCriteria[0];
+      if (key === 'distance') {
+        // sort legs by distance
+        filtered.sort((a, b) => {
+          const comparison = compareByKey(a, b, 'distance', false);
           return order === 'asc' ? comparison : -comparison;
-        } else {
-          // Multiple criteria: combine their effects
-          // We'll sum the differences. Each criterion contributes to score:
-          // If order is 'asc', use comparison as is. If 'desc', invert it.
-          let score = 0;
-          updatedCriteria.forEach((crit) => {
-            const comparison = compareByKey(a, b, crit.key);
-            score += comparison * (crit.order === 'asc' ? 1 : -1);
+        });
+      } else {
+        // price or travelTime: sort providers
+        filtered.forEach((leg) => {
+          leg.providers.sort((a, b) => {
+            const comparison = compareByKey(a, b, key, true);
+            return order === 'asc' ? comparison : -comparison;
           });
-
-          // score > 0 means a < b, score < 0 means a > b
-          if (score > 0) return 1;
-          if (score < 0) return -1;
-          return 0;
-        }
-      });
-    });
-
-    if (updatedCriteria.some((c) => c.key === 'distance')) {
-      const distanceCrit = updatedCriteria.find((c) => c.key === 'distance');
-      sortedRoutes.sort((a, b) => {
-        const comparison = a.routeInfo.distance - b.routeInfo.distance;
-        return distanceCrit.order === 'asc' ? comparison : -comparison;
-      });
+        });
+      }
     }
 
-    setFilteredRoutes(sortedRoutes);
+    setFilteredRoutes(filtered);
+  }, [sortCriteria]);
+
+  const handleSort = (criteria) => {
+    if (sortCriteria.length > 0 && sortCriteria[0].key === criteria) {
+      // Criterion is already active
+      const current = sortCriteria[0];
+      if (current.order === 'asc') {
+        // Asc -> Desc
+        setSortCriteria([{ key: criteria, order: 'desc' }]);
+      } else if (current.order === 'desc') {
+        // Desc -> Off (remove)
+        setSortCriteria([]);
+      }
+    } else {
+      // Not active yet, turn on asc
+      setSortCriteria([{ key: criteria, order: 'asc' }]);
+    }
+
+    applyFiltersAndSorting(selectedOrigin, selectedDestination, companyFilter, routes);
   };
 
   const handleCompanyFilterChange = (company) => {
     setCompanyFilter(company);
-
-    if (company === '') {
-      setFilteredRoutes(
-        routes.filter(
-          (leg) =>
-            leg.routeInfo.from.name === selectedOrigin &&
-            leg.routeInfo.to.name === selectedDestination
-        )
-      );
-    } else {
-      const filtered = routes
-        .filter(
-          (leg) =>
-            leg.routeInfo.from.name === selectedOrigin &&
-            leg.routeInfo.to.name === selectedDestination
-        )
-        .map((leg) => ({
-          ...leg,
-          providers: leg.providers.filter(
-            (provider) => provider.company.name === company
-          ),
-        }))
-        .filter((leg) => leg.providers.length > 0);
-
-      setFilteredRoutes(filtered);
-    }
+    applyFiltersAndSorting(selectedOrigin, selectedDestination, company, routes);
   };
+
+  useEffect(() => {
+    applyFiltersAndSorting(selectedOrigin, selectedDestination, companyFilter, routes);
+  }, [selectedOrigin, selectedDestination, companyFilter, routes, sortCriteria, applyFiltersAndSorting]);
 
   return (
     <div className="reservation-container">
@@ -290,13 +285,6 @@ function ReservationForm() {
           value={selectedOrigin}
           onChange={(e) => {
             setSelectedOrigin(e.target.value);
-            setFilteredRoutes(
-              routes.filter(
-                (leg) =>
-                  leg.routeInfo.from.name === e.target.value &&
-                  leg.routeInfo.to.name === selectedDestination
-              )
-            );
           }}
           className="filter-dropdown"
         >
@@ -312,13 +300,6 @@ function ReservationForm() {
           value={selectedDestination}
           onChange={(e) => {
             setSelectedDestination(e.target.value);
-            setFilteredRoutes(
-              routes.filter(
-                (leg) =>
-                  leg.routeInfo.from.name === selectedOrigin &&
-                  leg.routeInfo.to.name === e.target.value
-              )
-            );
           }}
           className="filter-dropdown"
         >
@@ -331,158 +312,149 @@ function ReservationForm() {
         </select>
       </div>
 
-      <>
-        <h2 className="reservation-title">Select a Flight</h2>
-        <div className="filter-container">
-          <div className="filter-dropdown-container">
-            <select
-              value={companyFilter}
-              onChange={(e) => handleCompanyFilterChange(e.target.value)}
-              className="filter-dropdown"
-            >
-              <option value="">All Companies</option>
-              {Array.from(
-                new Set(
-                  routes
-                    .filter(
-                      (leg) =>
-                        leg.routeInfo.from.name === selectedOrigin &&
-                        leg.routeInfo.to.name === selectedDestination
-                    )
-                    .flatMap((leg) =>
-                      leg.providers.map((provider) => provider.company.name)
-                    )
-                )
-              ).map((company, index) => (
-                <option key={index} value={company}>
-                  {company}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="sort-container">
-            <button
-              onClick={() => handleSort('price')}
-              className={`sort-button ${
-                sortCriteria.some((c) => c.key === 'price') ? 'active' : ''
-              }`}
-            >
-              Sort by Price{' '}
-              {sortCriteria.find((c) => c.key === 'price')?.order === 'asc'
-                ? 'Low → High'
-                : sortCriteria.find((c) => c.key === 'price')?.order === 'desc'
-                ? 'High → Low'
-                : ''}
-            </button>
-            <button
-              onClick={() => handleSort('distance')}
-              className={`sort-button ${
-                sortCriteria.some((c) => c.key === 'distance') ? 'active' : ''
-              }`}
-            >
-              Sort by Distance{' '}
-              {sortCriteria.find((c) => c.key === 'distance')?.order === 'asc'
-                ? 'Low → High'
-                : sortCriteria.find((c) => c.key === 'distance')?.order === 'desc'
-                ? 'High → Low'
-                : ''}
-            </button>
-            <button
-              onClick={() => handleSort('travelTime')}
-              className={`sort-button ${
-                sortCriteria.some((c) => c.key === 'travelTime') ? 'active' : ''
-              }`}
-            >
-              Sort by Travel Time{' '}
-              {sortCriteria.find((c) => c.key === 'travelTime')?.order === 'asc'
-                ? 'Low → High'
-                : sortCriteria.find((c) => c.key === 'travelTime')?.order === 'desc'
-                ? 'High → Low'
-                : ''}
-            </button>
-          </div>
+      <h2 className="reservation-title">Select a Flight</h2>
+      <div className="filter-container">
+        <div className="filter-dropdown-container">
+          <select
+            value={companyFilter}
+            onChange={(e) => handleCompanyFilterChange(e.target.value)}
+            className="filter-dropdown"
+          >
+            <option value="">All Companies</option>
+            {Array.from(
+              new Set(
+                routes
+                  .filter(
+                    (leg) =>
+                      leg.routeInfo.from.name === selectedOrigin &&
+                      leg.routeInfo.to.name === selectedDestination
+                  )
+                  .flatMap((leg) =>
+                    leg.providers.map((provider) => provider.company.name)
+                  )
+              )
+            ).map((company, index) => (
+              <option key={index} value={company}>
+                {company}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div
-          className="card-container"
-          ref={scrollContainerRef}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onMouseMove={handleMouseMove}
-          style={{ 
-            cursor: 'grab', 
-            height: '400px',       
-            overflowY: 'auto',
-            userSelect: 'none'
-          }}
-        >
-          {filteredRoutes.map((leg) =>
-            leg.providers.map((provider) => (
-              <div
-                key={provider.id}
-                data-id={provider.id}
-                className={`card ${
-                  selectedRoute?.provider?.id === provider.id ? 'selected' : ''
-                }`}
-              >
-                <h2>{provider.company.name}</h2>
-                <h3>
-                  {leg.routeInfo.from.name} → {leg.routeInfo.to.name}
-                </h3>
-                <p>Price: {provider.price}</p>
-                <p>Distance: {leg.routeInfo.distance} km</p>
-                <p>Travel Time: {provider.travelTime} hours</p>
-                <p>Flight Start: {new Date(provider.flightStart).toLocaleString()}</p>
-                <p>Flight End: {new Date(provider.flightEnd).toLocaleString()}</p>
-              </div>
-            ))
-          )}
-          <div style={{ height: '3000px' }}></div>
-        </div>
-
-        <button
-          onClick={() => setAutoScroll(!autoScroll)}
-          className={`toggle-button ${autoScroll ? 'active' : ''}`}
-        >
-          {autoScroll ? 'Stop Auto-Scroll' : 'Start Auto-Scroll'}
-        </button>
-
-        <form onSubmit={handleSubmit} className="reservation-form">
-          <h2>Make a Reservation</h2>
-          <input
-            className="form-input"
-            type="text"
-            placeholder="First Name"
-            value={formData.firstName}
-            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-            required
-          />
-          <input
-            className="form-input"
-            type="text"
-            placeholder="Last Name"
-            value={formData.lastName}
-            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-            required
-          />
-          <p>Total Price: {formData.totalPrice}</p>
-          <p>Travel Time: {formData.travelTime} hours</p>
-          <button className="submit-button" type="submit">
-            Reserve
+        <div className="sort-container">
+          <button
+            onClick={() => handleSort('price')}
+            className={`sort-button ${
+              sortCriteria.some((c) => c.key === 'price') ? 'active' : ''
+            }`}
+          >
+            Sort by Price{' '}
+            {sortCriteria.find((c) => c.key === 'price')?.order === 'asc'
+              ? 'Low → High'
+              : sortCriteria.find((c) => c.key === 'price')?.order === 'desc'
+              ? 'High → Low'
+              : ''}
           </button>
-        </form>
-      </>
+          <button
+            onClick={() => handleSort('distance')}
+            className={`sort-button ${
+              sortCriteria.some((c) => c.key === 'distance') ? 'active' : ''
+            }`}
+          >
+            Sort by Distance{' '}
+            {sortCriteria.find((c) => c.key === 'distance')?.order === 'asc'
+              ? 'Low → High'
+              : sortCriteria.find((c) => c.key === 'distance')?.order === 'desc'
+              ? 'High → Low'
+              : ''}
+          </button>
+          <button
+            onClick={() => handleSort('travelTime')}
+            className={`sort-button ${
+              sortCriteria.some((c) => c.key === 'travelTime') ? 'active' : ''
+            }`}
+          >
+            Sort by Travel Time{' '}
+            {sortCriteria.find((c) => c.key === 'travelTime')?.order === 'asc'
+              ? 'Low → High'
+              : sortCriteria.find((c) => c.key === 'travelTime')?.order === 'desc'
+              ? 'High → Low'
+              : ''}
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="card-container"
+        ref={scrollContainerRef}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        style={{ 
+          cursor: 'grab', 
+          height: '400px',       
+          overflowY: 'auto',
+          userSelect: 'none'
+        }}
+      >
+        {filteredRoutes.map((leg) =>
+          leg.providers.map((provider) => (
+            <div
+              key={provider.id}
+              data-id={provider.id}
+              className={`card ${
+                selectedRoute?.provider?.id === provider.id ? 'selected' : ''
+              }`}
+            >
+              <h2>{provider.company.name}</h2>
+              <h3>
+                {leg.routeInfo.from.name} → {leg.routeInfo.to.name}
+              </h3>
+              <p>Price: {provider.price}</p>
+              <p>Distance: {leg.routeInfo.distance} km</p>
+              <p>Travel Time: {provider.travelTime} hours</p>
+              <p>Flight Start: {new Date(provider.flightStart).toLocaleString()}</p>
+              <p>Flight End: {new Date(provider.flightEnd).toLocaleString()}</p>
+            </div>
+          ))
+        )}
+        <div style={{ height: '3000px' }}></div>
+      </div>
+
+      <button
+        onClick={() => setAutoScroll(!autoScroll)}
+        className={`toggle-button ${autoScroll ? 'active' : ''}`}
+      >
+        {autoScroll ? 'Stop Auto-Scroll' : 'Start Auto-Scroll'}
+      </button>
+
+      <form onSubmit={handleSubmit} className="reservation-form">
+        <h2>Make a Reservation</h2>
+        <input
+          className="form-input"
+          type="text"
+          placeholder="First Name"
+          value={formData.firstName}
+          onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+          required
+        />
+        <input
+          className="form-input"
+          type="text"
+          placeholder="Last Name"
+          value={formData.lastName}
+          onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+          required
+        />
+        <p>Total Price: {formData.totalPrice}</p>
+        <p>Travel Time: {formData.travelTime} hours</p>
+        <button className="submit-button" type="submit">
+          Reserve
+        </button>
+      </form>
     </div>
   );
-}
-
-function calculateTravelTime(provider) {
-  if (!provider) return 0;
-  const start = new Date(provider.flightStart);
-  const end = new Date(provider.flightEnd);
-  return Math.round((end - start) / (1000 * 60 * 60));
 }
 
 export default ReservationForm;

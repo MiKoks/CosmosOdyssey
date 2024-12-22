@@ -1,63 +1,103 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import '../pricelist.css'; // Ensure this CSS file is correctly imported
 
 function Pricelist() {
-  const [legs, setLegs] = useState([]);
+  const [pricelists, setPricelists] = useState([]);
+  const [selectedPricelist, setSelectedPricelist] = useState(null);
   const [error, setError] = useState(null);
+
   useEffect(() => {
     axios
-      .get('http://127.0.0.1:8000/api/latest-pricelist')
+      .get('http://127.0.0.1:8000/api/all-pricelists') // Ensure the API endpoint returns all pricelists
       .then((response) => {
-        console.log('Pricelist API Response:', response.data);
-        setLegs(response.data.pricelist.legs || []);
+        const data = response.data || [];
+        setPricelists(data);
+
+        // Automatically select the most recent pricelist
+        if (data.length > 0) {
+          setSelectedPricelist(data[0]);
+        }
       })
       .catch((err) => {
-        console.error('Error fetching the latest pricelist:', err);
-        setError('Failed to load routes. Please try again later.');
+        console.error('Error fetching pricelists:', err);
+        setError('Failed to load pricelists. Please try again later.');
       });
   }, []);
-  
+
+  const handlePricelistChange = (event) => {
+    const selectedId = event.target.value;
+    const pricelist = pricelists.find((p) => p.id === parseInt(selectedId));
+    setSelectedPricelist(pricelist);
+  };
+
   return (
-    <div>
-      <h1>Available Routes</h1>
+    <div className="pricelist-container">
+      <h1 className="page-title">Available Pricelists</h1>
       {error ? (
-        <p>{error}</p>
+        <p className="error-message">{error}</p>
       ) : (
-        legs.length > 0 ? (
-          legs.map((leg, index) => (
-            <div key={index}>
-              <h2>
-                Route: {leg.routeInfo?.from?.name} → {leg.routeInfo?.to?.name}
-              </h2>
-              <p>Distance: {leg.routeInfo?.distance || 0} km</p>
-              <h3>Providers:</h3>
-              {leg.providers && leg.providers.length > 0 ? (
-                leg.providers.map((provider, idx) => (
-                  <div key={idx}>
-                    <p>Company: {provider.company?.name || 'N/A'}</p>
-                    <p>Price: {provider.price || 'N/A'}</p>
-                    <p>
-                      Flight Start:{' '}
-                      {provider.flightStart
-                        ? new Date(provider.flightStart).toLocaleString()
-                        : 'N/A'}
-                    </p>
-                    <p>
-                      Flight End:{' '}
-                      {provider.flightEnd
-                        ? new Date(provider.flightEnd).toLocaleString()
-                        : 'N/A'}
-                    </p>
+        <>
+          <div className="dropdown-container">
+            <label className="dropdown-label" htmlFor="pricelist-select">
+              Select a Pricelist:
+            </label>
+            <select
+              id="pricelist-select"
+              className="dropdown"
+              onChange={handlePricelistChange}
+              value={selectedPricelist?.id || ''}
+            >
+              {pricelists.map((pricelist) => (
+                <option key={pricelist.id} value={pricelist.id}>
+                  Valid Until: {new Date(pricelist.valid_until).toLocaleString()}
+                </option>
+              ))}
+            </select>
+          </div>
+          {selectedPricelist ? (
+            <div className="pricelist-details">
+              <h2 className="section-title">Routes for Selected Pricelist</h2>
+              {selectedPricelist.legs && selectedPricelist.legs.length > 0 ? (
+                selectedPricelist.legs.map((leg, index) => (
+                  <div className="route-card" key={index}>
+                    <h3>
+                      Route: {leg.routeInfo?.from?.name} → {leg.routeInfo?.to?.name}
+                    </h3>
+                    <p>Distance: {leg.routeInfo?.distance || 0} km</p>
+                    <h4>Providers:</h4>
+                    {leg.providers && leg.providers.length > 0 ? (
+                      leg.providers.map((provider, idx) => (
+                        <div className="provider-details" key={idx}>
+                          <p>Company: {provider.company?.name || 'N/A'}</p>
+                          <p>Price: {provider.price || 'N/A'}</p>
+                          <p>
+                            Flight Start:{' '}
+                            {provider.flightStart
+                              ? new Date(provider.flightStart).toLocaleString()
+                              : 'N/A'}
+                          </p>
+                          <p>
+                            Flight End:{' '}
+                            {provider.flightEnd
+                              ? new Date(provider.flightEnd).toLocaleString()
+                              : 'N/A'}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p>No providers available for this route.</p>
+                    )}
                   </div>
                 ))
               ) : (
-                <p>No providers available for this route.</p>
+                <p>No routes available for this pricelist.</p>
               )}
             </div>
-          ))
-        ) : (
-          <p>Loading routes...</p>
-        )
+          ) : (
+            <p>Select a pricelist to see the routes.</p>
+          )}
+        </>
       )}
     </div>
   );

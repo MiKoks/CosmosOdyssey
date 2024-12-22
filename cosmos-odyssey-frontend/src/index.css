@@ -79,8 +79,14 @@ code {
   margin-bottom: 10px;
 }
 
+.card:hover {
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
 .card.selected {
   border: 2px solid blue;
+  background-color: #f0f8ff; /* Light blue background for selection */
 }
 
 /* Toggle Button */

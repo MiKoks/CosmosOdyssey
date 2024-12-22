@@ -9,62 +9,60 @@ class RouteFinderService
 {
     public function findRoutes($origin, $destination, $company = null, $sortKey = null, $sortOrder = 'asc')
     {
-        ini_set('memory_limit', '512M'); // Temporarily increase memory limit to avoid memory exhaustion
-    
         $activePricelist = DB::table('pricelists')
             ->where('valid_until', '>', now())
             ->orderBy('created_at', 'desc')
             ->first();
-    
+
         if (!$activePricelist) {
-            // No active pricelist. Possibly fetch one now:
+            // Fetch active pricelists if not available
             app(\App\Http\Controllers\PricelistController::class)->fetchActivePricelists();
-    
-            // Re-check for newly inserted pricelist
             $activePricelist = DB::table('pricelists')
                 ->where('valid_until', '>', now())
                 ->orderBy('created_at', 'desc')
                 ->first();
-    
+
             if (!$activePricelist) {
-                return []; // still no valid pricelist, so we can't provide routes
+                return [];
             }
         }
-    
+
         $data = json_decode($activePricelist->data, true);
         $legs = $data['legs'] ?? [];
-    
-        // Build graph and find routes as before
+
+        // Build graph and find routes
         $graph = $this->buildGraph($legs);
         $paths = $this->findShortestPathsBFS($graph, $origin, $destination);
-    
+
         if (empty($paths)) {
             return [];
         }
-    
+
         $aggregated = $this->aggregateRoutesFromPaths($paths, $graph);
-    
-        // Filter by company if specified
-    if ($company) {
-        $aggregated = array_filter($aggregated, function ($route) use ($company) {
-            return in_array($company, $route['companies']);
-        });
-    }
-    
+
+        // Add `pricelist_id` to each aggregated route
+        foreach ($aggregated as &$route) {
+            $route['pricelist_id'] = $activePricelist->id;
+        }
+
+        // Sort and filter logic (if necessary)
+        if ($company) {
+            $aggregated = array_filter($aggregated, function ($route) use ($company) {
+                return in_array($company, $route['companies']);
+            });
+        }
+
         if ($sortKey) {
             usort($aggregated, function ($a, $b) use ($sortKey, $sortOrder) {
                 $cmp = $this->compareByKey($a, $b, $sortKey);
                 return $sortOrder === 'asc' ? $cmp : -$cmp;
             });
         }
-    
-        // Limit response size if the result set is too large to handle
-        if (count($aggregated) > 10) { // Example threshold for large data
-            $aggregated = array_slice($aggregated, 0, 10);
-        }
-    
+
         return array_values($aggregated);
     }
+
+
     
     private function buildGraph($legs)
     {
@@ -140,9 +138,9 @@ class RouteFinderService
         $allAggregated = [];
         foreach ($paths as $path) {
             $allLegRoutes = [];
-            for ($i = 0; $i < count($path)-1; $i++) {
+            for ($i = 0; $i < count($path) - 1; $i++) {
                 $from = $path[$i];
-                $to = $path[$i+1];
+                $to = $path[$i + 1];
                 $possibleProviders = array_filter($graph[$from], fn($r) => $r['to'] === $to);
                 if (empty($possibleProviders)) {
                     $allLegRoutes = [];
@@ -150,12 +148,14 @@ class RouteFinderService
                 }
                 if ($i === 0) {
                     foreach ($possibleProviders as $p) {
+                        $p['routeId'] = uniqid(); // Add unique routeId
                         $allLegRoutes[] = [$p];
                     }
                 } else {
                     $newRoutes = [];
                     foreach ($allLegRoutes as $existingRoute) {
                         foreach ($possibleProviders as $p) {
+                            $p['routeId'] = uniqid(); // Add unique routeId
                             $newRoutes[] = [...$existingRoute, $p];
                         }
                     }
@@ -180,12 +180,14 @@ class RouteFinderService
                     'totalPrice' => $totalPrice,
                     'totalDistance' => $totalDistance,
                     'totalTime' => $totalTime,
-                    'companies' => $companies
+                    'companies' => $companies,
+                    'pricelist_id' => $graph['pricelist_id'] ?? null, // Attach pricelist_id
                 ];
             }
         }
         return $allAggregated;
     }
+
 
     /**
      * BFS to find the shortest routes (by hop count) from $origin to $destination.

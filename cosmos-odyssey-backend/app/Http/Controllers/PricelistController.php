@@ -99,17 +99,35 @@ class PricelistController extends Controller
     }
 
     public function getLatestPricelist()
-{
-    $activePricelist = DB::table('pricelists')
-        ->where('valid_until', '>', now())
-        ->orderBy('created_at', 'desc')
-        ->first();
-    if ($activePricelist) {
-        return response()->json([
-            'pricelist' => json_decode($activePricelist->data)
-        ]);
+    {
+        $activePricelist = DB::table('pricelists')
+            ->where('valid_until', '>', now())
+            ->orderBy('created_at', 'desc')
+            ->first();
+        if ($activePricelist) {
+            return response()->json([
+                'pricelist' => json_decode($activePricelist->data)
+            ]);
+        }
+        return response()->json(['error' => 'No active pricelist found'], 404);
     }
-    return response()->json(['error' => 'No active pricelist found'], 404);
-}
 
+    public function getAllPricelists()
+    {
+        $pricelists = DB::table('pricelists')
+            ->orderBy('created_at', 'desc')
+            ->take(15)
+            ->get()
+            ->map(function ($pricelist) {
+                return [
+                    'id' => $pricelist->id,
+                    'valid_until' => $pricelist->valid_until,
+                    'created_at' => $pricelist->created_at,
+                    'updated_at' => $pricelist->updated_at,
+                    'legs' => json_decode($pricelist->data, true)['legs'] ?? [],
+                ];
+            });
+
+        return response()->json($pricelists);
+    }
 }

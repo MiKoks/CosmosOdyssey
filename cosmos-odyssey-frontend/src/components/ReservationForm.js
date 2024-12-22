@@ -125,14 +125,23 @@ function ReservationForm() {
     scrollContainerRef.current.scrollTop = scrollTop - walk;
   };
 
-  const handleSelect = (provider, leg) => {
-    setSelectedRoute({ provider, leg });
+  const handleSelect = (route) => {
+    setSelectedRoute({
+      legs: route.legs,
+      totalPrice: route.totalPrice,
+      totalTime: route.totalTime,
+      companies: route.companies,
+      routeIds: route.legs.map((leg) => leg.routeId), // Collect route IDs
+      pricelist_id: route.pricelist_id, // Include pricelist_id
+    });
+  
     setFormData({
       ...formData,
-      totalPrice: provider.price,
-      travelTime: provider.travelTime,
+      totalPrice: route.totalPrice,
+      travelTime: route.totalTime,
     });
   };
+  
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -140,19 +149,29 @@ function ReservationForm() {
       alert('Please select a flight!');
       return;
     }
-
+  
     const requestData = {
-      ...formData,
-      routeId: selectedRoute.provider.id,
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      routes: selectedRoute.routeIds, // Send route IDs to backend
+      total_price: selectedRoute.totalPrice,
+      total_travel_time: selectedRoute.totalTime,
+      company_names: selectedRoute.companies.join(', '),
+      pricelist_id: selectedRoute.pricelist_id, // Send pricelist ID
     };
-
+  
+    console.log('Submitting reservation:', requestData);
+  
     axios
       .post('http://127.0.0.1:8000/api/reservations', requestData)
       .then(() => alert('Reservation made successfully!'))
-      .catch((err) =>
-        alert(`Failed to make reservation: ${err.response?.data || err.message}`)
-      );
-  };
+      .catch((err) => {
+        console.error('Reservation submission error:', err.response?.data || err.message);
+        alert(`Failed to make reservation: ${JSON.stringify(err.response?.data || err.message)}`);
+      });
+  };  
+
+  
 
   const handleSort = (criteria) => {
     if (sortCriteria.length > 0 && sortCriteria[0].key === criteria) {
@@ -190,7 +209,9 @@ function ReservationForm() {
   
     fetch(`http://127.0.0.1:8000/api/findRoutes?${params.toString()}`)
       .then(res => res.json())
-      .then(data => setFilteredRoutes(data))
+      .then(data => {
+        console.log('Fetched Routes:', data);
+       setFilteredRoutes(data)})
       .catch(err => console.error('Error fetching routes:', err));
   }, [selectedOrigin, selectedDestination, companyFilter, sortCriteria]);
 
@@ -302,23 +323,30 @@ function ReservationForm() {
       >
         {filteredRoutes.map((route, i) => (
           <div
-            key={i}
-            className="card"
-          >
-            {route.legs.length > 1 ? <h2>Combined Route</h2> : <h2>Direct Route</h2>}
-            <p>Total Price: {route.totalPrice}</p>
-            <p>Total Distance: {route.totalDistance} km</p>
-            <p>Total Time: {route.totalTime} hours</p>
-            <p>Companies: {route.companies.join(', ')}</p>
-            <p>Stops: {route.legs.length - 1}</p>
-            <ul>
-              {route.legs.map((leg, idx) => (
-                <li key={idx}>
-                  {leg.from} → {leg.to}, Price: {leg.price}, Time: {leg.travelTime}h, Company: {leg.company}
-                </li>
-              ))}
-            </ul>
-          </div>
+          key={i}
+          className={`card ${selectedRoute?.legs === route.legs ? 'selected' : ''}`}
+          onClick={() => handleSelect(route)} // Pass the full route, including pricelist_id
+          style={{
+            cursor: 'pointer',
+            border: selectedRoute?.legs === route.legs ? '2px solid blue' : '1px solid #ccc',
+          }}
+        >
+          {route.legs.length > 1 ? <h2>Combined Route</h2> : <h2>Direct Route</h2>}
+          <p>Total Price: {route.totalPrice}</p>
+          <p>Total Distance: {route.totalDistance} km</p>
+          <p>Total Time: {route.totalTime} hours</p>
+          <p>Companies: {route.companies.join(', ')}</p>
+          <p>Stops: {route.legs.length - 1}</p>
+          <p>Pricelist ID: {route.pricelist_id}</p> {/* Optional, for debugging */}
+          <ul>
+            {route.legs.map((leg, idx) => (
+              <li key={idx}>
+                {leg.from} → {leg.to}, Price: {leg.price}, Time: {leg.travelTime}h, Company: {leg.company}
+              </li>
+            ))}
+          </ul>
+        </div>        
+        
         ))}
         <div style={{ height: '3000px' }}></div>
       </div>

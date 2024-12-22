@@ -8,19 +8,15 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     *php artisan migrate
+     *
      * @return void
      */
     public function up()
     {
-        Schema::create('pricelists', function (Blueprint $table) {
-            $table->id();
-            $table->longText('data');
-            $table->dateTime('valid_until');
-            $table->timestamps();
+        Schema::table('reservations', function (Blueprint $table) {
+            //
         });
     }
-
 
     /**
      * Reverse the migrations.
@@ -29,6 +25,8 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('pricelists');
+        Schema::table('reservations', function (Blueprint $table) {
+            //
+        });
     }
 };

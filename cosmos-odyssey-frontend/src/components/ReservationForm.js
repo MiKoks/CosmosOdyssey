@@ -153,12 +153,14 @@ function ReservationForm() {
     const requestData = {
       first_name: formData.firstName,
       last_name: formData.lastName,
-      routes: selectedRoute.routeIds, // Send route IDs to backend
+      routes: selectedRoute.routeIds,
       total_price: selectedRoute.totalPrice,
       total_travel_time: selectedRoute.totalTime,
-      company_names: selectedRoute.companies.join(', '),
-      pricelist_id: selectedRoute.pricelist_id, // Send pricelist ID
-    };
+      company_names: Array.isArray(selectedRoute.companies) 
+      ? selectedRoute.companies 
+      : [selectedRoute.companies],
+      pricelist_id: selectedRoute.pricelist_id || null,
+  };
   
     console.log('Submitting reservation:', requestData);
   

@@ -17,21 +17,18 @@ class PricelistController extends Controller
         if ($response->ok()) {
             $data = $response->json();
 
-            // Check if the pricelist already exists in the database
+
             $existingPricelist = DB::table('pricelists')
                 ->where('valid_until', Carbon::parse($data['validUntil']))
                 ->first();
 
             if (!$existingPricelist) {
-                // Insert only if it's not a duplicate
                 DB::table('pricelists')->insert([
                     'data' => json_encode($data),
                     'valid_until' => Carbon::parse($data['validUntil']),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
-
-                // Keep only the last 15 pricelists
                 $count = DB::table('pricelists')->count();
                 if ($count > 15) {
                     $excess = $count - 15;
@@ -41,8 +38,6 @@ class PricelistController extends Controller
                         ->delete();
                 }
             }
-
-            // Always fetch the latest active pricelist
             $activePricelist = DB::table('pricelists')
                 ->where('valid_until', '>', now())
                 ->orderBy('created_at', 'desc')
@@ -63,15 +58,9 @@ class PricelistController extends Controller
 
             }
         }
-
-        // If no pricelist is active or available
         return response()->json(['error' => 'No active pricelist found'], 404);
     }
 
-
-
-
-    // Method to return routes after processing
     public function findRoutes(Request $request, \App\Services\RouteFinderService $routeFinder)
     {
         try {

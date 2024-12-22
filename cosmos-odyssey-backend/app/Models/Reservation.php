@@ -16,5 +16,6 @@ class Reservation extends Model
         'total_price',
         'total_travel_time',
         'company_names',
+        'pricelist_id',
     ];
 }

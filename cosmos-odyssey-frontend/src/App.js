@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import PricelistsPage from './pages/PricelistsPage';
 import ReservationPage from './pages/ReservationPage';
 import Navbar from './components/Navbar';
+import './index.css';
 
 function App() {
   return (

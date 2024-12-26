@@ -11,21 +11,15 @@ function ReservationForm() {
     totalPrice: 0,
     travelTime: 0,
   });
-
   const [selectedOrigin, setSelectedOrigin] = useState('');
   const [selectedDestination, setSelectedDestination] = useState('');
   const [origins, setOrigins] = useState([]);
   const [destinations, setDestinations] = useState([]);
-  
   const [autoScroll, setAutoScroll] = useState(true);
   const [companyFilter, setCompanyFilter] = useState('');
   const [companies, setCompanies] = useState([]);
-  // One sorting criterion with asc/desc/off states
   const [sortCriteria, setSortCriteria] = useState([]);
-
   const scrollContainerRef = useRef(null);
-
-  // Drag scrolling variables
   const [mouseDown, setMouseDown] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(null);
@@ -33,7 +27,6 @@ function ReservationForm() {
   const [didMove, setDidMove] = useState(false);
   const [mouseDownProvider, setMouseDownProvider] = useState(null);
   const [mouseDownLeg, setMouseDownLeg] = useState(null);
-
   const [scrollDirectionDown, setScrollDirectionDown] = useState(true);
 
   useEffect(() => {
@@ -131,8 +124,8 @@ function ReservationForm() {
       totalPrice: route.totalPrice,
       totalTime: route.totalTime,
       companies: route.companies,
-      routeIds: route.legs.map((leg) => leg.routeId), // Collect route IDs
-      pricelist_id: route.pricelist_id, // Include pricelist_id
+      routeIds: route.legs.map((leg) => leg.routeId),
+      pricelist_id: route.pricelist_id,
     });
   
     setFormData({
@@ -234,7 +227,6 @@ function ReservationForm() {
             </option>
           ))}
         </select>
-
         <select
           value={selectedDestination}
           onChange={(e) => setSelectedDestination(e.target.value)}

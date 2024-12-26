@@ -1,17 +1,23 @@
 <?php
-// app/Http/Controllers/ReservationController.php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Reservation;
-use Illuminate\Support\Facades\DB;
+use App\Services\ReservationService;
 
 class ReservationController extends Controller
 {
+    protected $reservationService;
+
+    public function __construct(ReservationService $reservationService)
+    {
+        $this->reservationService = $reservationService;
+    }
+
     public function store(Request $request)
     {
         \Log::info('Request Data:', $request->all());
-        
+
         $validated = $request->validate([
             'first_name' => 'required|string',
             'last_name' => 'required|string',
@@ -22,15 +28,7 @@ class ReservationController extends Controller
             'pricelist_id' => 'required|integer|exists:pricelists,id', 
         ]);
 
-        $reservation = Reservation::create([
-            'first_name' => $validated['first_name'],
-            'last_name' => $validated['last_name'],
-            'routes' => json_encode($validated['routes']),
-            'total_price' => $validated['total_price'],
-            'total_travel_time' => $validated['total_travel_time'],
-            'company_names' => json_encode($validated['company_names']),
-            'pricelist_id' => $validated['pricelist_id'],
-        ]);
+        $reservation = $this->reservationService->createReservation($validated);
 
         return response()->json([
             'message' => 'Reservation created successfully',
@@ -38,11 +36,9 @@ class ReservationController extends Controller
         ], 201);
     }
 
-
-
     public function index()
     {
-        $reservations = DB::table('reservations')->get();
+        $reservations = $this->reservationService->getAllReservations();
         return response()->json($reservations);
     }
 }

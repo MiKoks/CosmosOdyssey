@@ -6,10 +6,11 @@ function Pricelist() {
   const [pricelists, setPricelists] = useState([]);
   const [selectedPricelist, setSelectedPricelist] = useState(null);
   const [error, setError] = useState(null);
+  const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
 
   useEffect(() => {
     axios
-      .get('http://127.0.0.1:8000/api/all-pricelists')
+      .get(`${apiBaseUrl}/api/all-pricelists`)
       .then((response) => {
         const data = response.data || [];
         setPricelists(data);

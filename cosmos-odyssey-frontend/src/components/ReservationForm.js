@@ -27,10 +27,11 @@ function ReservationForm() {
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(null);
   const [scrollTop, setScrollTop] = useState(0);
+  const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
 
   useEffect(() => {
     axios
-      .get('http://127.0.0.1:8000/api/pricelists')
+      .get(`${apiBaseUrl}/api/pricelists`)
       .then((response) => {
         const { pricelist, companies } = response.data;
         const legs = pricelist.legs;
@@ -61,7 +62,7 @@ function ReservationForm() {
     }
 
     axios
-      .get(`http://127.0.0.1:8000/api/findRoutes?${params.toString()}`)
+      .get(`${apiBaseUrl}/api/findRoutes?${params.toString()}`)
       .then((response) => {
         setFilteredRoutes(response.data);
       })
@@ -156,7 +157,7 @@ function ReservationForm() {
     };
 
     axios
-      .post('http://127.0.0.1:8000/api/reservations', requestData)
+      .post(`${apiBaseUrl}/api/reservations`, requestData)
       .then(() => alert('Reservation made successfully!'))
       .catch((err) => {
         console.error('Reservation submission error:', err.response?.data || err.message);

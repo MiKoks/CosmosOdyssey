@@ -1,0 +1,11 @@
+# Specify the backend as a separate service
+[backend]
+root = "cosmos-odyssey-backend"
+build = "composer install && php artisan config:clear && php artisan cache:clear && php artisan migrate --force"
+start = "php artisan serve --host=0.0.0.0 --port=$PORT"
+
+# Specify the frontend as a separate service
+[frontend]
+root = "cosmos-odyssey-frontend"
+build = "npm install && npm run build"
+start = "npx serve -s build -l $PORT"

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import '../index.css';
+import DropdownSection from './DropdownSection';
+import FilterAndSort from './FilterAndSort';
+import RouteCard from './RouteCard';
 
 function ReservationForm() {
   const [filteredRoutes, setFilteredRoutes] = useState([]);
@@ -20,30 +23,50 @@ function ReservationForm() {
   const [companies, setCompanies] = useState([]);
   const [sortCriteria, setSortCriteria] = useState([]);
   const scrollContainerRef = useRef(null);
-  const [mouseDown, setMouseDown] = useState(false);
+  const [scrollDirectionDown, setScrollDirectionDown] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(null);
   const [scrollTop, setScrollTop] = useState(0);
-  const [didMove, setDidMove] = useState(false);
-  const [mouseDownProvider, setMouseDownProvider] = useState(null);
-  const [mouseDownLeg, setMouseDownLeg] = useState(null);
-  const [scrollDirectionDown, setScrollDirectionDown] = useState(true);
 
   useEffect(() => {
     axios
-        .get('http://127.0.0.1:8000/api/pricelists')
-        .then((response) => {
-            const { pricelist, companies } = response.data;
-            const legs = pricelist.legs;
-            const uniqueOrigins = [...new Set(legs.map((leg) => leg.routeInfo.from.name))];
-            const uniqueDestinations = [...new Set(legs.map((leg) => leg.routeInfo.to.name))];
-            setOrigins(uniqueOrigins);
-            setDestinations(uniqueDestinations);
-            setCompanies(companies);
-        })
-        .catch((err) => console.error('Error fetching pricelists:', err));
-}, []);
-  
+      .get('http://127.0.0.1:8000/api/pricelists')
+      .then((response) => {
+        const { pricelist, companies } = response.data;
+        const legs = pricelist.legs;
+        const uniqueOrigins = [...new Set(legs.map((leg) => leg.routeInfo.from.name))];
+        const uniqueDestinations = [...new Set(legs.map((leg) => leg.routeInfo.to.name))];
+        setOrigins(uniqueOrigins);
+        setDestinations(uniqueDestinations);
+        setCompanies(companies);
+      })
+      .catch((err) => console.error('Error fetching pricelists:', err));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedOrigin || !selectedDestination) {
+      setFilteredRoutes([]);
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.append('origin', selectedOrigin);
+    params.append('destination', selectedDestination);
+    if (companyFilter) params.append('company', companyFilter);
+
+    if (sortCriteria.length > 0) {
+      const { key, order } = sortCriteria[0];
+      params.append('sortKey', key);
+      params.append('sortOrder', order);
+    }
+
+    axios
+      .get(`http://127.0.0.1:8000/api/findRoutes?${params.toString()}`)
+      .then((response) => {
+        setFilteredRoutes(response.data);
+      })
+      .catch((err) => console.error('Error fetching routes:', err));
+  }, [selectedOrigin, selectedDestination, companyFilter, sortCriteria]);
 
   useEffect(() => {
     let interval;
@@ -71,51 +94,29 @@ function ReservationForm() {
   }, [autoScroll, scrollDirectionDown]);
 
   const handleMouseDown = (e) => {
-    setMouseDown(true);
-    setDidMove(false);
-    setIsDragging(false);
+    setIsDragging(true);
     setStartY(e.clientY);
-
-    const container = scrollContainerRef.current;
-    if (container) {
-      setScrollTop(container.scrollTop);
-      container.style.cursor = 'grabbing';
+    if (scrollContainerRef.current) {
+      setScrollTop(scrollContainerRef.current.scrollTop);
+      scrollContainerRef.current.style.cursor = 'grabbing';
     }
-    setMouseDownProvider(null);
-    setMouseDownLeg(null);
-  };
-
-  const handleMouseUp = () => {
-    setMouseDown(false);
-    const container = scrollContainerRef.current;
-    if (container) {
-      container.style.cursor = 'grab';
-    }
-
-    if (!didMove && mouseDownProvider && mouseDownLeg) {
-      handleSelect(mouseDownProvider, mouseDownLeg);
-    }
-
-    setMouseDownProvider(null);
-    setMouseDownLeg(null);
-    setIsDragging(false);
-    setStartY(null);
   };
 
   const handleMouseMove = (e) => {
-    if (!mouseDown || startY === null) return; 
-
-    const diff = Math.abs(e.clientY - startY);
-    if (diff > 5 && !didMove) {
-      setDidMove(true);
-      setIsDragging(true);
-    }
-
     if (!isDragging) return;
     e.preventDefault();
-    const y = e.clientY;
-    const walk = (y - startY) * 2;
-    scrollContainerRef.current.scrollTop = scrollTop - walk;
+    const container = scrollContainerRef.current;
+    if (container) {
+      const walk = (e.clientY - startY) * -1; //scroll direction
+      container.scrollTop = scrollTop + walk;
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.style.cursor = 'grab';
+    }
   };
 
   const handleSelect = (route) => {
@@ -127,14 +128,13 @@ function ReservationForm() {
       routeIds: route.legs.map((leg) => leg.routeId),
       pricelist_id: route.pricelist_id,
     });
-  
+
     setFormData({
       ...formData,
       totalPrice: route.totalPrice,
       travelTime: route.totalTime,
     });
   };
-  
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -142,21 +142,19 @@ function ReservationForm() {
       alert('Please select a flight!');
       return;
     }
-  
+
     const requestData = {
       first_name: formData.firstName,
       last_name: formData.lastName,
       routes: selectedRoute.routeIds,
       total_price: selectedRoute.totalPrice,
       total_travel_time: selectedRoute.totalTime,
-      company_names: Array.isArray(selectedRoute.companies) 
-      ? selectedRoute.companies 
-      : [selectedRoute.companies],
+      company_names: Array.isArray(selectedRoute.companies)
+        ? selectedRoute.companies
+        : [selectedRoute.companies],
       pricelist_id: selectedRoute.pricelist_id || null,
-  };
-  
-    console.log('Submitting reservation:', requestData);
-  
+    };
+
     axios
       .post('http://127.0.0.1:8000/api/reservations', requestData)
       .then(() => alert('Reservation made successfully!'))
@@ -164,9 +162,7 @@ function ReservationForm() {
         console.error('Reservation submission error:', err.response?.data || err.message);
         alert(`Failed to make reservation: ${JSON.stringify(err.response?.data || err.message)}`);
       });
-  };  
-
-  
+  };
 
   const handleSort = (criteria) => {
     if (sortCriteria.length > 0 && sortCriteria[0].key === criteria) {
@@ -185,164 +181,45 @@ function ReservationForm() {
     setCompanyFilter(company);
   };
 
-  useEffect(() => {
-    if (!selectedOrigin || !selectedDestination) {
-      setFilteredRoutes([]);
-      return;
-    }
-  
-    const params = new URLSearchParams();
-    params.append('origin', selectedOrigin);
-    params.append('destination', selectedDestination);
-    if (companyFilter) params.append('company', companyFilter);
-  
-    if (sortCriteria.length > 0) {
-      const { key, order } = sortCriteria[0];
-      params.append('sortKey', key);
-      params.append('sortOrder', order);
-    }
-  
-    fetch(`http://127.0.0.1:8000/api/findRoutes?${params.toString()}`)
-      .then(res => res.json())
-      .then(data => {
-        console.log('Fetched Routes:', data);
-       setFilteredRoutes(data)})
-      .catch(err => console.error('Error fetching routes:', err));
-  }, [selectedOrigin, selectedDestination, companyFilter, sortCriteria]);
-
   return (
     <div className="reservation-container">
       <h3 className="reservation-title">Select Origin and Destination</h3>
 
-      <div className="initial-dropdowns">
-        <select
-          value={selectedOrigin}
-          onChange={(e) => setSelectedOrigin(e.target.value)}
-          className="filter-dropdown"
-        >
-          <option value="">Select Origin</option>
-          {origins.map((origin, index) => (
-            <option key={index} value={origin}>
-              {origin}
-            </option>
-          ))}
-        </select>
-        <select
-          value={selectedDestination}
-          onChange={(e) => setSelectedDestination(e.target.value)}
-          className="filter-dropdown"
-        >
-          <option value="">Select Destination</option>
-          {destinations.map((destination, index) => (
-            <option key={index} value={destination}>
-              {destination}
-            </option>
-          ))}
-        </select>
-      </div>
+      <DropdownSection
+        origins={origins}
+        destinations={destinations}
+        selectedOrigin={selectedOrigin}
+        setSelectedOrigin={setSelectedOrigin}
+        selectedDestination={selectedDestination}
+        setSelectedDestination={setSelectedDestination}
+      />
 
       <h3 className="reservation-title">Select a Flight</h3>
-      <div className="filter-container">
-        <div className="filter-dropdown-container">
-        <select
-          value={companyFilter}
-          onChange={(e) => handleCompanyFilterChange(e.target.value)}
-          className="filter-dropdown"
-        >
-          <option value="">All Companies</option>
-          {companies.map((company, index) => (
-            <option key={index} value={company}>
-              {company}
-            </option>
-          ))}
-        </select>
-        </div>
-
-        <div className="sort-container">
-          <button
-            onClick={() => handleSort('price')}
-            className={`sort-button ${
-              sortCriteria.some((c) => c.key === 'price') ? 'active' : ''
-            }`}
-          >
-            Sort by Price{' '}
-            {sortCriteria.find((c) => c.key === 'price')?.order === 'asc'
-              ? 'Low → High'
-              : sortCriteria.find((c) => c.key === 'price')?.order === 'desc'
-              ? 'High → Low'
-              : ''}
-          </button>
-          <button
-            onClick={() => handleSort('distance')}
-            className={`sort-button ${
-              sortCriteria.some((c) => c.key === 'distance') ? 'active' : ''
-            }`}
-          >
-            Sort by Distance{' '}
-            {sortCriteria.find((c) => c.key === 'distance')?.order === 'asc'
-              ? 'Low → High'
-              : sortCriteria.find((c) => c.key === 'distance')?.order === 'desc'
-              ? 'High → Low'
-              : ''}
-          </button>
-          <button
-            onClick={() => handleSort('travelTime')}
-            className={`sort-button ${
-              sortCriteria.some((c) => c.key === 'travelTime') ? 'active' : ''
-            }`}
-          >
-            Sort by Travel Time{' '}
-            {sortCriteria.find((c) => c.key === 'travelTime')?.order === 'asc'
-              ? 'Low → High'
-              : sortCriteria.find((c) => c.key === 'travelTime')?.order === 'desc'
-              ? 'High → Low'
-              : ''}
-          </button>
-        </div>
-      </div>
+      <FilterAndSort
+        companies={companies}
+        companyFilter={companyFilter}
+        handleCompanyFilterChange={handleCompanyFilterChange}
+        handleSort={handleSort}
+        sortCriteria={sortCriteria}
+      />
 
       <div
         className="card-container"
         ref={scrollContainerRef}
         onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onMouseMove={handleMouseMove}
-        style={{ 
-          cursor: 'grab', 
-          height: '400px',       
-          overflowY: 'auto',
-          userSelect: 'none'
-        }}
+        style={{ cursor: 'grab', height: '400px', overflowY: 'auto', userSelect: 'none' }}
       >
         {filteredRoutes.map((route, i) => (
-          <div
-          key={i}
-          className={`card ${selectedRoute?.legs === route.legs ? 'selected' : ''}`}
-          onClick={() => handleSelect(route)} // Pass the full route, including pricelist_id
-          style={{
-            cursor: 'pointer',
-            border: selectedRoute?.legs === route.legs ? '2px solid blue' : '1px solid #ccc',
-          }}
-        >
-          {route.legs.length > 1 ? <h2>Combined Route</h2> : <h2>Direct Route</h2>}
-          <p>Total Price: {route.totalPrice}</p>
-          <p>Total Distance: {route.totalDistance} km</p>
-          <p>Total Time: {route.totalTime} hours</p>
-          <p>Companies: {route.companies.join(', ')}</p>
-          <p>Stops: {route.legs.length - 1}</p>
-          <p>Pricelist ID: {route.pricelist_id}</p> {/* Optional, for debugging */}
-          <ul>
-            {route.legs.map((leg, idx) => (
-              <li key={idx}>
-                {leg.from} → {leg.to}, Price: {leg.price}, Time: {leg.travelTime}h, Company: {leg.company}
-              </li>
-            ))}
-          </ul>
-        </div>        
-        
+          <RouteCard
+            key={i}
+            route={route}
+            selectedRoute={selectedRoute}
+            handleSelect={handleSelect}
+          />
         ))}
-        <div style={{ height: '3000px' }}></div>
       </div>
 
       <button

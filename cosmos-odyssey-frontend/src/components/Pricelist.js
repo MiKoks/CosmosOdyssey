@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import '../pricelist.css'; // Ensure this CSS file is correctly imported
+import '../pricelist.css';
 
 function Pricelist() {
   const [pricelists, setPricelists] = useState([]);
@@ -9,12 +9,11 @@ function Pricelist() {
 
   useEffect(() => {
     axios
-      .get('http://127.0.0.1:8000/api/all-pricelists') // Ensure the API endpoint returns all pricelists
+      .get('http://127.0.0.1:8000/api/all-pricelists')
       .then((response) => {
         const data = response.data || [];
         setPricelists(data);
 
-        // Automatically select the most recent pricelist
         if (data.length > 0) {
           setSelectedPricelist(data[0]);
         }
